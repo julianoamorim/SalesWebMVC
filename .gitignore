@@ -1,0 +1,11 @@
+# Ignore build outputs
+bin/
+obj/
+
+# Optional IDE folders
+.vs/
+.vscode/
+
+# User-specific
+*.user
+*.suo
