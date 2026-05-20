@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
+using SalesWebMVC.Caching;
 using SalesWebMVC.Models;
 using SalesWebMVC.Repositories;
 using SalesWebMVC.Repositories.Interfaces;
@@ -11,10 +13,12 @@ namespace SalesWebMVC.Controller
     [Route("api/[controller]")]
     public class LivrariaController : ControllerBase
     {
-        ILivrariaRepository _livrariaRepository;
-        public LivrariaController(ILivrariaRepository livrariaRepository)
+        private readonly ILivrariaRepository _livrariaRepository;
+        private readonly CacheService _cache;
+        public LivrariaController(ILivrariaRepository livrariaRepository, CacheService cache)
         {
             _livrariaRepository = livrariaRepository;
+            _cache = cache;
         }
         
         [HttpGet("autores")]
@@ -27,8 +31,7 @@ namespace SalesWebMVC.Controller
         public IActionResult GetAutorById(int id)
         {
             try
-            {
-                //var autor = _livrariaRepository.ListarAutorById(id);
+            {                
                 var autor = _livrariaRepository.ListarAutorById(id); //Interface p/ usar Dummy no teste das chamadas
                 return Ok(autor);    
             }
@@ -47,12 +50,21 @@ namespace SalesWebMVC.Controller
         }
 
         [HttpGet("livro")]
-        public IActionResult GetLivroById(int id)
+        public async Task<IActionResult> GetLivroById(int id)
         {
+            var livroCache = await _cache.GetAsync(id.ToString());
+            Livro? livro;
+            if(!string.IsNullOrWhiteSpace(livroCache))
+            {
+                livro = JsonConvert.DeserializeObject<Livro>(livroCache);
+                Console.WriteLine("Adicionado ao Cache");
+                return Ok(livro);
+            }
+            livro = _livrariaRepository.LocalizarLivro(id);
+            await _cache.SetAsync(id.ToString(), JsonConvert.SerializeObject(livro)); //Salva no CacheRedis
             try
             {
-                var livro = _livrariaRepository.LocalizarLivro(id); //Interface p/ usar Dummy no teste das chamadas
-                return Ok(livro);    
+                return Ok(livro); 
             }
             catch (NullReferenceException)
             {

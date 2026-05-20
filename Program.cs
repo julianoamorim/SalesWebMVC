@@ -2,13 +2,36 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using SalesWebMVC.Caching;
 using SalesWebMVC.Filters;
 using SalesWebMVC.Repositories;
 using SalesWebMVC.Repositories.Interfaces;
+using Azure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddScoped<CacheService>();
 builder.Services.AddEndpointsApiExplorer();
+
+// Injeta o Key Vault na configuração
+var keyVaultUrl = builder.Configuration["KeyVault:Url"];
+
+builder.Configuration.AddAzureKeyVault(
+    new Uri(keyVaultUrl),
+    new DefaultAzureCredential()  // usa Managed Identity automaticamente
+);
+
+// Registra o Redis usando o secret do Key Vault
+var redisConnection = builder.Configuration["redis-connectionstring-full"];
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = redisConnection;
+});
+if (!string.IsNullOrWhiteSpace(redisConnection))
+    Console.WriteLine("✅ Key Vault conectado! Redis:ConnectionString carregado com sucesso.");
+else
+    Console.WriteLine("❌ Falha: Redis:ConnectionString não encontrado no Key Vault.");
+
 builder.Services.AddSwaggerGen(c => {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
